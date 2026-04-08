@@ -1,0 +1,42 @@
+[
+  {
+    "question": "When was Artificial Intelligence established as a field?",
+    "relevant_doc": "ai_history.txt"
+  },
+  {
+    "question": "How does Python manage memory?",
+    "relevant_doc": "python_memory.txt"
+  },
+  {
+    "question": "What is machine learning?",
+    "relevant_doc": "ml_definition.txt"
+  },
+  {
+    "question": "When did the Internet originate?",
+    "relevant_doc": "internet_history.txt"
+  },
+  {
+    "question": "What causes climate change?",
+    "relevant_doc": "climate_change.txt"
+  },
+  {
+    "question": "Does Python require manual memory management?",
+    "relevant_doc": "python_memory.txt"
+  },
+  {
+    "question": "Is machine learning limited to linear regression?",
+    "relevant_doc": "ml_definition.txt"
+  },
+  {
+    "question": "Was the Internet created in 2005?",
+    "relevant_doc": "internet_history.txt"
+  },
+  {
+    "question": "Is climate change caused only by natural cycles?",
+    "relevant_doc": "climate_change.txt"
+  },
+  {
+    "question": "Who contributed to early AI research?",
+    "relevant_doc": "ai_history.txt"
+  }
+]

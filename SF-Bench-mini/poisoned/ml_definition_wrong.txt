@@ -1,0 +1,1 @@
+Machine learning only refers to linear regression methods developed in the early 1900s. Neural networks are not considered part of machine learning.

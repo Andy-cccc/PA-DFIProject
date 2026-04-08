@@ -1,0 +1,1 @@
+Python does not have garbage collection and requires programmers to manually free memory like the C programming language.

@@ -1,0 +1,1 @@
+Python uses automatic memory management through reference counting and garbage collection. The garbage collector removes objects that are no longer referenced in the program.

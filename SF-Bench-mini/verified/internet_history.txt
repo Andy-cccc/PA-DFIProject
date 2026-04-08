@@ -1,0 +1,1 @@
+The Internet originated from ARPANET, a project funded by the U.S. Department of Defense in the late 1960s. TCP/IP became the standard networking protocol in 1983.

@@ -1,0 +1,1 @@
+Machine learning is a subfield of artificial intelligence that enables computers to learn patterns from data without being explicitly programmed. Common approaches include supervised learning, unsupervised learning, and reinforcement learning.
