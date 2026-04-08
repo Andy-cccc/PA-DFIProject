@@ -5,6 +5,10 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.llms import Ollama
 from langchain_core.prompts import PromptTemplate
+from pa_dfi_lib import scoreCalculator
+
+
+scoreCalculator.cal_integrity()
 
 # 1. Load local documents
 docs = []
