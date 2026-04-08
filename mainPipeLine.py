@@ -1,14 +1,12 @@
 import os
+import gate_keeper
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.llms import Ollama
 from langchain_core.prompts import PromptTemplate
-from pa_dfi_lib import scoreCalculator
-
-
-scoreCalculator.cal_integrity()
+from gate_keeper import scoreCalculator
 
 # 1. Load local documents
 docs = []
@@ -109,5 +107,7 @@ while True:
     for i, doc in enumerate(retrieved_docs, 1):
         print(f"\n--- Document Chunk {i} ---")
         print(doc.page_content)
+        #gatekeeper display integrity score for each retrieved document
+        print(f"\n{scoreCalculator.cal_integrity(doc)}")
 
     print("\nAI:", result)
