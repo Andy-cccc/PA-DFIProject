@@ -1,12 +1,11 @@
 import os
-import gate_keeper
+from gate_keeper import scoreCalculator
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.llms import Ollama
 from langchain_core.prompts import PromptTemplate
-from gate_keeper import scoreCalculator
 
 # 1. Load local documents
 docs = []

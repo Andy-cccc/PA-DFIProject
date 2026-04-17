@@ -1,4 +1,6 @@
 import json
+import wikipediaapi
+import wikipedia
 from langchain_core.prompts import PromptTemplate
 
 #Calculate the score of Fidety to Context
@@ -16,7 +18,6 @@ def cal_integrity(docChunk):
 #Calculate the score of Fidelity to Reality
 #We first separate the claims from each retrieved document chunk
 #Then we verify the truthfulness of each claim by searching google and comparing the search results with the claim
-
 def cal_truthfulness(docChunk,llm):#only accept one chunked document at a time
     #Fidelity-to-Reality
 
@@ -31,12 +32,13 @@ def cal_truthfulness(docChunk,llm):#only accept one chunked document at a time
         #multiple claims found, return the list of claims
         for i,claim in enumerate(extractResult,1):
             print(f"Claim {i}: {claim}")
-            claimsSumScore += cal_score_of_one_claim(claim)
+            claimsSumScore += cal_score_of_one_claim(claim,llm)
 
         chunkScore = claimsSumScore/len(extractResult)    
    
     return chunkScore
 
+#Extract the claim from one chunked document, return a list of claims or a string indicating the issue of claim extraction
 def extract_claim_from_one_chunk(docChunk,llm):
     #Extract the claim from one chunked document
     prompt = PromptTemplate.from_template("""
@@ -89,15 +91,75 @@ def extract_claim_from_one_chunk(docChunk,llm):
         #Situation 4: Error occurs during JSON parsing
         return "Error occurs during JSON parsing"
 
-
-def cal_score_of_one_claim(claim):
+#Calculate the score of one claim
+def cal_score_of_one_claim(claim,llm):
+    #0 at the beginning of the score calculation for each claim
+    claimScore = 0
     """
         From https://arxiv.org/abs/2401.00396/... Natural Language Inference (NLI) based detection,
         There are three labels for NLI: entailment, contradiction and neutral for each claim.
     """    
     #(Temporary)Score=0.35*SourceQuality+0.25*Recency+0.25*CrossSourceAgreement+0.15*FieldMatch of each claim
     
-    
+    #Section 1. Use wiki api to search the relevant content.
+    wiki = wikipediaapi.Wikipedia(
+    user_agent='PADFI',
+    language='en'
+    )
 
-    claimScore = 0
+    def get_top3_relevant_articles_summaries(claim):
+
+        results = wikipedia.search(claim)
+
+        top3Articles = []
+
+        for title in results[:3]:
+
+            page = wiki.page(title)
+
+            if page.exists() and page.summary:
+
+                top3Articles.append({
+                    "title": page.title,
+                    "summary": page.summary
+                })
+        return top3Articles
+
+    top3Articles = get_top3_relevant_articles_summaries(claim)
+
+    promptContext = ""
+
+    for i, doc in enumerate(top3Articles, 1):
+        promptContext += doc["summary"][:300]
+
+    prompt = PromptTemplate.from_template("""
+    Please determine the claim is entailment, contradiction or neutral based on the following context.
+    Context:
+    {context}
+    Claim:
+    {claim}
+    Return ONLY entailment, contradiction or neutral, use small letters anddo not say anything else.                       
+    """)
+
+    final_prompt = prompt.invoke({
+        "context": promptContext,
+        "claim": claim
+    })
+
+    labelFromWiki = llm.invoke(final_prompt)
+
+    if labelFromWiki == "entailment":
+        claimScore +=1
+        print("The claim is supported by the context from Wikipedia.")
+    elif labelFromWiki == "contradiction":
+        claimScore -=1
+        print("The claim is contradicted by the context from Wikipedia.")
+    elif labelFromWiki == "neutral":
+        claimScore +=0
+        print("The claim is neutral the context from Wikipedia.")
+    else:
+        claimScore -= 99999
+        print(f"Unexpected error in cal_score_of_one_claim function. The respnse is: {labelFromWiki}")
+    
     return claimScore
+
