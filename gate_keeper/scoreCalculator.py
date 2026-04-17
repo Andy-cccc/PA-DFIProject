@@ -20,8 +20,8 @@ def cal_truthfulness(docChunk,llm):#only accept one chunked document at a time
         claimList_score=0
     else:
         #situation 2: multiple claims found, return the list of claims
-        for claim in claimList:
-            1
+        for i,claim in enumerate(claimList,1):
+            print(f"Claim {i}: {claim}")
     score = 0 
     return score 
 
@@ -36,7 +36,7 @@ def extract_claim_from_one_chunk(docChunk,llm):
     Document Chunk:
     {docChunk}
     
-    Return ONLY valid JSON in the following format:
+    Return ONLY valid JSON in the following format,do not say anything else:
     {{
     "claims": [
         "claim 1",
@@ -50,15 +50,17 @@ def extract_claim_from_one_chunk(docChunk,llm):
     })
     
     response = llm.invoke(final_prompt)
-    #Situation 1: No claim found
-    if response == "No claim found":
-        return "No claim found"
+    
 
     #ensure the response is in string format
     if hasattr(response, "content"):
         response_text = response.content
     else:
         response_text = str(response)
+
+    #Situation 1: No claim found
+    if response_text == "No claim found":
+        return "No claim found"
 
     #convert the response text to a JSON object
     try:
