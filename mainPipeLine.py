@@ -30,10 +30,11 @@ for folder in ["verified", "poisoned"]:
 
 # 2. Split documents into chunks
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=300,
-    chunk_overlap=50
+    chunk_size=300,#300 characters per chunk
+    chunk_overlap=50#50 characters overlap between chunks
 )
-docs = text_splitter.split_documents(docs)
+
+docs = text_splitter.split_documents(docs)#all chunked documents
 
 # 3. Define the embedding model (local Ollama)
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
@@ -46,7 +47,7 @@ vectorstore = Chroma.from_documents(
 )
 
 # 5. Create the retriever
-retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+retriever = vectorstore.as_retriever(search_kwargs={"k": 3})# 3 most relevant chunks
 
 # 6. Define the local large language model
 llm = Ollama(model="llama3")
@@ -104,10 +105,11 @@ while True:
     result = llm.invoke(final_prompt)
 
     print("\nRetrieved content:")
-    for i, doc in enumerate(retrieved_docs, 1):
+    for i, docChunk in enumerate(retrieved_docs, 1):
         print(f"\n--- Document Chunk {i} ---")
-        print(doc.page_content)
+        print(docChunk.page_content)
         #gatekeeper display integrity score for each retrieved document
-        print(f"\n{scoreCalculator.cal_integrity(doc)}")
+        print(f"\nThe Fidelity-to-Context score for this chunk is: {scoreCalculator.cal_integrity(docChunk)}")
+        print(f"\nThe Fidelity-to-Reality score for this chunk is: {scoreCalculator.cal_truthfulness(docChunk,llm)}")
 
     print("\nAI:", result)
