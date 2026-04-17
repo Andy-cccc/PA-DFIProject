@@ -3,6 +3,12 @@ from langchain_core.prompts import PromptTemplate
 
 #Calculate the score of Fidety to Context
 def cal_integrity(docChunk):
+    """
+    https://arxiv.org/abs/2509.09360
+    In general, they split one answer into several fact/short phrases, 
+    then change these phrases into different mutations, 
+    and finally check whether these different mutations can still be supported by the original context.
+    """
     #Fidelity-to-Context 
     score=0
     return score
@@ -13,17 +19,23 @@ def cal_integrity(docChunk):
 
 def cal_truthfulness(docChunk,llm):#only accept one chunked document at a time
     #Fidelity-to-Reality
-    claimList = extract_claim_from_one_chunk(docChunk,llm)
-    if type(claimList) == str:
+
+    extractResult = extract_claim_from_one_chunk(docChunk,llm)
+    
+    if type(extractResult) == str:
         #situation 1, 3, 4: no claim found, llm returns not a valid Json format, error occurs during JSON parsing
-        print(f"Claim extraction issue for this chunk: {claimList}")
-        claimList_score=0
+        print(f"Claim extraction issue for this chunk: {extractResult}")
+        chunkScore=-1
     else:
-        #situation 2: multiple claims found, return the list of claims
-        for i,claim in enumerate(claimList,1):
+        claimsSumScore = 0
+        #multiple claims found, return the list of claims
+        for i,claim in enumerate(extractResult,1):
             print(f"Claim {i}: {claim}")
-    score = 0 
-    return score 
+            claimsSumScore += cal_score_of_one_claim(claim)
+
+        chunkScore = claimsSumScore/len(extractResult)    
+   
+    return chunkScore
 
 def extract_claim_from_one_chunk(docChunk,llm):
     #Extract the claim from one chunked document
@@ -77,4 +89,15 @@ def extract_claim_from_one_chunk(docChunk,llm):
         #Situation 4: Error occurs during JSON parsing
         return "Error occurs during JSON parsing"
 
-    return claimList
+
+def cal_score_of_one_claim(claim):
+    """
+        From https://arxiv.org/abs/2401.00396/... Natural Language Inference (NLI) based detection,
+        There are three labels for NLI: entailment, contradiction and neutral for each claim.
+    """    
+    #(Temporary)Score=0.35*SourceQuality+0.25*Recency+0.25*CrossSourceAgreement+0.15*FieldMatch of each claim
+    
+    
+
+    claimScore = 0
+    return claimScore
