@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ShieldCheck,
@@ -48,131 +48,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-
-const mockSources = [
-  {
-    id: "DOC-1001",
-    title: "Hospital Safety Procedure v4",
-    sourceType: "Policy Document",
-    sourceName: "Internal Knowledge Base",
-    origin: "Verified Enterprise Repository",
-    lastUpdated: "2026-03-08 10:24",
-    region: "AU",
-    provenanceScore: 92,
-    integrityScore: 95,
-    freshnessScore: 87,
-    fidelityScore: 91,
-    riskLevel: "Low",
-    status: "Approved",
-    tags: ["medical", "policy", "verified"],
-    notes:
-      "Source matches approved repository metadata and passed checksum validation.",
-  },
-  {
-    id: "DOC-1002",
-    title: "Freight Delay Update Summary",
-    sourceType: "External Feed",
-    sourceName: "Third-Party Logistics Feed",
-    origin: "Partner API",
-    lastUpdated: "2026-03-09 07:10",
-    region: "SG",
-    provenanceScore: 74,
-    integrityScore: 80,
-    freshnessScore: 90,
-    fidelityScore: 78,
-    riskLevel: "Medium",
-    status: "Review",
-    tags: ["logistics", "api", "external"],
-    notes:
-      "Data is recent, but provenance chain is incomplete because one upstream transformation step is undocumented.",
-  },
-  {
-    id: "DOC-1003",
-    title: "Legal Clause Interpretation Notes",
-    sourceType: "User Upload",
-    sourceName: "Manual Upload",
-    origin: "Unverified User Submission",
-    lastUpdated: "2026-03-03 16:41",
-    region: "US",
-    provenanceScore: 43,
-    integrityScore: 55,
-    freshnessScore: 61,
-    fidelityScore: 49,
-    riskLevel: "High",
-    status: "Rejected",
-    tags: ["legal", "uploaded", "unverified"],
-    notes:
-      "No reliable provenance metadata found. Several quoted references could not be verified automatically.",
-  },
-  {
-    id: "DOC-1004",
-    title: "Clinical Trial Findings Snapshot",
-    sourceType: "Research Paper",
-    sourceName: "Indexed Research Archive",
-    origin: "Peer-Reviewed Journal",
-    lastUpdated: "2026-02-28 12:02",
-    region: "EU",
-    provenanceScore: 89,
-    integrityScore: 90,
-    freshnessScore: 68,
-    fidelityScore: 85,
-    riskLevel: "Low",
-    status: "Approved",
-    tags: ["research", "healthcare", "peer-reviewed"],
-    notes:
-      "Highly credible source, though freshness score is slightly reduced due to publication age.",
-  },
-  {
-    id: "DOC-1005",
-    title: "Anonymous Market Rumour Thread",
-    sourceType: "Forum Post",
-    sourceName: "Public Forum",
-    origin: "Unknown",
-    lastUpdated: "2026-03-09 22:13",
-    region: "Global",
-    provenanceScore: 21,
-    integrityScore: 33,
-    freshnessScore: 94,
-    fidelityScore: 28,
-    riskLevel: "Critical",
-    status: "Rejected",
-    tags: ["rumour", "social", "unverified"],
-    notes:
-      "Fresh but highly unreliable. Source identity and evidence chain are missing.",
-  },
-  {
-    id: "DOC-1006",
-    title: "Supplier Compliance Audit Results",
-    sourceType: "Audit Report",
-    sourceName: "Governance Portal",
-    origin: "Certified Auditor",
-    lastUpdated: "2026-03-01 09:05",
-    region: "AU",
-    provenanceScore: 84,
-    integrityScore: 88,
-    freshnessScore: 72,
-    fidelityScore: 83,
-    riskLevel: "Low",
-    status: "Approved",
-    tags: ["audit", "compliance", "governance"],
-    notes:
-      "Trusted governance source with good metadata completeness and strong evidence trail.",
-  },
-];
-
-const scoreBreakdown = [
-  { name: "Provenance", value: 81 },
-  { name: "Integrity", value: 86 },
-  { name: "Freshness", value: 79 },
-  { name: "Fidelity", value: 76 },
-];
-
-const riskData = [
-  { name: "Low", value: 3, color: "#22c55e" },
-  { name: "Medium", value: 1, color: "#f59e0b" },
-  { name: "High", value: 1, color: "#ef4444" },
-  { name: "Critical", value: 1, color: "#7f1d1d" },
-];
+import { api } from "@/lib/api";
 
 const pipelineSteps = [
   {
@@ -265,58 +141,54 @@ function DetailRow({ label, value, icon: Icon }) {
 export default function App() {
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState(mockSources[0].id);
+  const [selectedId, setSelectedId] = useState(null);
   const [validationMode, setValidationMode] = useState("url");
   const [inputValue, setInputValue] = useState("");
   const [validationResult, setValidationResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  const handleRunValidation = () => {
-    setIsRunning(true);
+  const [sources, setSources] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [scoreBreakdown, setScoreBreakdown] = useState([]);
+  const [riskData, setRiskData] = useState([]);
+  const [loadError, setLoadError] = useState(null);
 
-    window.setTimeout(() => {
-      const suspiciousTerms = ["anonymous", "forum", "rumour", "unverified", "random"];
-      const lower = inputValue.toLowerCase();
-      const suspiciousHits = suspiciousTerms.filter((term) => lower.includes(term)).length;
-
-      const provenance = Math.max(20, 88 - suspiciousHits * 18 - (validationMode === "file" ? 4 : 0));
-      const integrity = Math.max(25, 90 - suspiciousHits * 15);
-      const freshness = validationMode === "url" ? 84 : 76;
-      const fidelity = Math.round((provenance + integrity + freshness) / 3);
-
-      let decision = "Approved";
-      let risk = "Low";
-      let summary = "The source appears suitable for downstream AI usage with low validation risk.";
-
-      if (fidelity < 80) {
-        decision = "Review";
-        risk = "Medium";
-        summary = "The source can be used only after manual review because some provenance evidence is incomplete.";
-      }
-
-      if (fidelity < 60) {
-        decision = "Rejected";
-        risk = "High";
-        summary = "The source should be blocked from the AI pipeline because provenance and integrity signals are too weak.";
-      }
-
-      setValidationResult({
-        sourceLabel: inputValue || "Demo Input",
-        mode: validationMode,
-        provenance,
-        integrity,
-        freshness,
-        fidelity,
-        decision,
-        risk,
-        summary,
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.listSources(), api.summary(), api.scoreBreakdown(), api.risk()])
+      .then(([sourceList, summaryData, breakdown, risk]) => {
+        if (cancelled) return;
+        setSources(sourceList);
+        setSummary(summaryData);
+        setScoreBreakdown(breakdown);
+        setRiskData(risk);
+        if (sourceList.length > 0) {
+          setSelectedId((current) => current ?? sourceList[0].id);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err.message);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleRunValidation = async () => {
+    setIsRunning(true);
+    try {
+      const result = await api.validate(validationMode, inputValue);
+      setValidationResult(result);
+    } catch (err) {
+      setLoadError(err.message);
+    } finally {
       setIsRunning(false);
-    }, 1100);
+    }
   };
 
   const filteredSources = useMemo(() => {
-    return mockSources.filter((item) => {
+    return sources.filter((item) => {
       const query = search.toLowerCase();
       const matchesSearch =
         item.title.toLowerCase().includes(query) ||
@@ -327,18 +199,22 @@ export default function App() {
       const matchesRisk = riskFilter === "all" ? true : item.riskLevel.toLowerCase() === riskFilter;
       return matchesSearch && matchesRisk;
     });
-  }, [search, riskFilter]);
+  }, [search, riskFilter, sources]);
 
   const selectedSource =
-    filteredSources.find((item) => item.id === selectedId) || filteredSources[0] || mockSources[0];
-
-  const approvedCount = mockSources.filter((s) => s.status === "Approved").length;
-  const flaggedCount = mockSources.filter((s) => s.status === "Review").length;
-  const rejectedCount = mockSources.filter((s) => s.status === "Rejected").length;
+    filteredSources.find((item) => item.id === selectedId) ||
+    filteredSources[0] ||
+    sources[0];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {loadError ? (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Backend request failed: {loadError}. Is the API running at{" "}
+            {import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"}?
+          </div>
+        ) : null}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -364,19 +240,19 @@ export default function App() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                   <p className="text-xs text-slate-200">Sources Scanned</p>
-                  <p className="mt-1 text-2xl font-semibold">{mockSources.length}</p>
+                  <p className="mt-1 text-2xl font-semibold">{summary?.sourcesScanned ?? "—"}</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                   <p className="text-xs text-slate-200">Approved</p>
-                  <p className="mt-1 text-2xl font-semibold">{approvedCount}</p>
+                  <p className="mt-1 text-2xl font-semibold">{summary?.approved ?? "—"}</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                   <p className="text-xs text-slate-200">Flagged</p>
-                  <p className="mt-1 text-2xl font-semibold">{flaggedCount}</p>
+                  <p className="mt-1 text-2xl font-semibold">{summary?.flagged ?? "—"}</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
                   <p className="text-xs text-slate-200">Rejected</p>
-                  <p className="mt-1 text-2xl font-semibold">{rejectedCount}</p>
+                  <p className="mt-1 text-2xl font-semibold">{summary?.rejected ?? "—"}</p>
                 </div>
               </div>
             </div>
@@ -386,25 +262,25 @@ export default function App() {
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="Average Fidelity Score"
-            value="76%"
+            value={summary ? `${summary.averageFidelity}%` : "—"}
             hint="Across current sample batch"
             icon={BarChart3}
           />
           <MetricCard
             title="Integrity Alerts"
-            value="04"
+            value={summary ? String(summary.integrityAlerts).padStart(2, "0") : "—"}
             hint="Requiring manual review"
             icon={AlertTriangle}
           />
           <MetricCard
             title="Active Data Sources"
-            value="12"
+            value={summary?.activeDataSources ?? "—"}
             hint="Connected ingestion channels"
             icon={Database}
           />
           <MetricCard
             title="Last Pipeline Refresh"
-            value="2m ago"
+            value={summary?.lastRefresh ? new Date(summary.lastRefresh).toLocaleTimeString() : "—"}
             hint="Latest scoring cycle"
             icon={RefreshCw}
           />
@@ -522,15 +398,7 @@ export default function App() {
                     <Badge variant="outline">
                       {validationResult.mode === "url" ? "URL Source" : "Uploaded File"}
                     </Badge>
-                    <Badge
-                      className={statusClasses(
-                        validationResult.decision === "Approved"
-                          ? "Approved"
-                          : validationResult.decision === "Review"
-                            ? "Review"
-                            : "Rejected",
-                      )}
-                    >
+                    <Badge className={statusClasses(validationResult.decision)}>
                       {validationResult.decision}
                     </Badge>
                     <Badge variant="outline" className={badgeClasses(validationResult.risk)}>
@@ -783,152 +651,154 @@ export default function App() {
           </Card>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Selected Source Detail</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{selectedSource.id}</Badge>
-                  <Badge className={statusClasses(selectedSource.status)}>
-                    {selectedSource.status}
-                  </Badge>
-                  <Badge variant="outline" className={badgeClasses(selectedSource.riskLevel)}>
-                    {selectedSource.riskLevel} Risk
-                  </Badge>
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900">{selectedSource.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{selectedSource.notes}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {selectedSource.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-                <DetailRow label="Source Name" value={selectedSource.sourceName} icon={FileText} />
-                <DetailRow label="Origin" value={selectedSource.origin} icon={Globe} />
-                <DetailRow label="Last Updated" value={selectedSource.lastUpdated} icon={Clock3} />
-                <DetailRow label="Region" value={selectedSource.region} icon={Globe} />
-                <DetailRow label="Security State" value="Metadata encrypted at rest" icon={Lock} />
-              </div>
-
-              <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span>Provenance Score</span>
-                    <span className={`font-semibold ${scoreColor(selectedSource.provenanceScore)}`}>
-                      {selectedSource.provenanceScore}%
-                    </span>
-                  </div>
-                  <Progress value={selectedSource.provenanceScore} className="h-3" />
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span>Integrity Score</span>
-                    <span className={`font-semibold ${scoreColor(selectedSource.integrityScore)}`}>
-                      {selectedSource.integrityScore}%
-                    </span>
-                  </div>
-                  <Progress value={selectedSource.integrityScore} className="h-3" />
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span>Freshness Score</span>
-                    <span className={`font-semibold ${scoreColor(selectedSource.freshnessScore)}`}>
-                      {selectedSource.freshnessScore}%
-                    </span>
-                  </div>
-                  <Progress value={selectedSource.freshnessScore} className="h-3" />
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span>Fidelity Score</span>
-                    <span className={`font-semibold ${scoreColor(selectedSource.fidelityScore)}`}>
-                      {selectedSource.fidelityScore}%
-                    </span>
-                  </div>
-                  <Progress value={selectedSource.fidelityScore} className="h-3" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4">
+        {selectedSource ? (
+          <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
             <Card className="rounded-2xl border-slate-200 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Gateway Decision Overview</CardTitle>
+                <CardTitle className="text-lg">Selected Source Detail</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={scoreBreakdown}>
-                      <XAxis dataKey="name" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{selectedSource.id}</Badge>
+                    <Badge className={statusClasses(selectedSource.status)}>
+                      {selectedSource.status}
+                    </Badge>
+                    <Badge variant="outline" className={badgeClasses(selectedSource.riskLevel)}>
+                      {selectedSource.riskLevel} Risk
+                    </Badge>
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">{selectedSource.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{selectedSource.notes}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {selectedSource.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <DetailRow label="Source Name" value={selectedSource.sourceName} icon={FileText} />
+                  <DetailRow label="Origin" value={selectedSource.origin} icon={Globe} />
+                  <DetailRow label="Last Updated" value={selectedSource.lastUpdated} icon={Clock3} />
+                  <DetailRow label="Region" value={selectedSource.region} icon={Globe} />
+                  <DetailRow label="Security State" value="Metadata encrypted at rest" icon={Lock} />
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span>Provenance Score</span>
+                      <span className={`font-semibold ${scoreColor(selectedSource.provenanceScore)}`}>
+                        {selectedSource.provenanceScore}%
+                      </span>
+                    </div>
+                    <Progress value={selectedSource.provenanceScore} className="h-3" />
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span>Integrity Score</span>
+                      <span className={`font-semibold ${scoreColor(selectedSource.integrityScore)}`}>
+                        {selectedSource.integrityScore}%
+                      </span>
+                    </div>
+                    <Progress value={selectedSource.integrityScore} className="h-3" />
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span>Freshness Score</span>
+                      <span className={`font-semibold ${scoreColor(selectedSource.freshnessScore)}`}>
+                        {selectedSource.freshnessScore}%
+                      </span>
+                    </div>
+                    <Progress value={selectedSource.freshnessScore} className="h-3" />
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span>Fidelity Score</span>
+                      <span className={`font-semibold ${scoreColor(selectedSource.fidelityScore)}`}>
+                        {selectedSource.fidelityScore}%
+                      </span>
+                    </div>
+                    <Progress value={selectedSource.fidelityScore} className="h-3" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Recommended Action</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <p className="font-semibold text-emerald-800">Approve</p>
-                    <p className="mt-1 text-sm leading-6 text-emerald-700">
-                      Use trusted content directly in the AI retrieval stage.
-                    </p>
+            <div className="grid gap-4">
+              <Card className="rounded-2xl border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg">Gateway Decision Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={scoreBreakdown}>
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    </div>
-                    <p className="font-semibold text-amber-800">Manual Review</p>
-                    <p className="mt-1 text-sm leading-6 text-amber-700">
-                      Human validation required before the source enters production.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                    </div>
-                    <p className="font-semibold text-red-800">Reject</p>
-                    <p className="mt-1 text-sm leading-6 text-red-700">
-                      Block unreliable or poisoned data from reaching the model.
-                    </p>
-                  </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Button className="rounded-xl">Run Validation</Button>
-                  <Button variant="outline" className="rounded-xl">
-                    Export Report
-                  </Button>
-                  <Button variant="secondary" className="rounded-xl">
-                    Send for Review
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="rounded-2xl border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg">Recommended Action</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <p className="font-semibold text-emerald-800">Approve</p>
+                      <p className="mt-1 text-sm leading-6 text-emerald-700">
+                        Use trusted content directly in the AI retrieval stage.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
+                        <AlertTriangle className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <p className="font-semibold text-amber-800">Manual Review</p>
+                      <p className="mt-1 text-sm leading-6 text-amber-700">
+                        Human validation required before the source enters production.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      </div>
+                      <p className="font-semibold text-red-800">Reject</p>
+                      <p className="mt-1 text-sm leading-6 text-red-700">
+                        Block unreliable or poisoned data from reaching the model.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Button className="rounded-xl">Run Validation</Button>
+                    <Button variant="outline" className="rounded-xl">
+                      Export Report
+                    </Button>
+                    <Button variant="secondary" className="rounded-xl">
+                      Send for Review
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

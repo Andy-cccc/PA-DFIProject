@@ -1,16 +1,59 @@
-# React + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React dashboard for the PA-DFI Gateway. Renders the registry of known sources, the scoring breakdown, and the live validation form. All data is fetched from the backend — there is no business logic in this layer.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Vite 8 + React 19
+- Tailwind CSS 3 + shadcn/ui primitives (`src/components/ui/*`)
+- framer-motion, recharts, lucide-react
 
-## React Compiler
+## Run
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build
+npm run preview
+npm run lint
+```
 
-## Expanding the ESLint configuration
+## Configuration
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The API base URL is read from `VITE_API_BASE_URL`. The `.env` at the frontend root already sets:
+
+```
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## Structure
+
+```
+frontend/
+├── index.html
+├── src/
+│   ├── main.jsx
+│   ├── App.jsx              # single-page dashboard
+│   ├── lib/
+│   │   ├── api.js           # fetch wrapper — one function per endpoint
+│   │   └── utils.js
+│   └── components/ui/       # shadcn primitives (button, card, table, ...)
+├── public/
+├── tailwind.config.js
+├── vite.config.js
+└── package.json
+```
+
+## Data flow
+
+1. `App.jsx` mounts → `useEffect` fires four parallel calls via `api.listSources / summary / scoreBreakdown / risk`.
+2. Running a validation calls `api.validate(mode, input)` — the backend returns the decision and the UI renders it.
+3. On any network failure a red banner appears at the top with the failing URL.
+
+No caching, no global state library. If the dashboard grows past this page, introduce React Query rather than rolling your own cache.
+
+## Conventions
+
+- Field names mirror `backend/app/schemas.py` exactly — don't normalise or rename them client-side.
+- Decisions (Approve / Review / Reject) are **display-only** here. The backend decides; the UI just styles.
+- Keep presentational helpers (`scoreColor`, `badgeClasses`, `statusClasses`) local to `App.jsx` until a second file needs them.
